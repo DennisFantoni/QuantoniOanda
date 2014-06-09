@@ -124,13 +124,13 @@ while True:
 
             if (robot_margin_closeout_pct>robot_mcpselltrigger):
                 robot_target_margin_used =robot_mcpselltrigger*  robot_NAV  #please test
-                robot_margin_reduce_need = (robot_margin_used-robot_target_margin_used)*robot_margin_rate_inv
+                robot_margin_reduce_need = (robot_margin_used*robot_margin_rate_inv-robot_target_margin_used)
                 number_to_go_long = math.floor(robot_margin_reduce_need /robot_onepos)
-                number_to_go_long=int(number_to_go_long)
+                number_to_go_long=int(number_to_go_long)+1  #+1 to get decidedly below max
                 if number_to_go_long>0:
                     try:
                         res=oanda.create_order(robot_accountid,instrument=robot_instrument,units=number_to_go_long, side="buy",type="market")
-                        ordercomment="Bought %s at %s" % (res['units'],res['price'])
+                        ordercomment="Bought %s at %s" % (res['tradeReduced']['units'],res['price'])
                     except Exception as e:
                         ordercomment="exception when trying to create sell order(%s)" % str(e)
                     sleep_seconds=1# be quick to follow up after order
