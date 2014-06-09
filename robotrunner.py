@@ -2,6 +2,7 @@ from time import sleep
 #export PYTHONPATH=$PYTHONPATH:/oanda/oandapy
 __author__ = 'ubuntu01'
 
+#todo code cleanup, change variable away from oanda3 as we run any acct. also check comments
 #todo set up spread awarenes, so we don't do trades if spread is too much
 #todo change trades so they come with a range that we will accept
 #todo create robot05.sh
@@ -14,6 +15,8 @@ __author__ = 'ubuntu01'
 #todo take profit module (might need to transfer money, probably not available in api)
 #todo if logstring is not different then dont print it
 #todo also print the time gotten from the srv
+#todo put in sanity checks that for instance blocks trading more than N orders each hour
+#todo test a gold like scenario with lowered margin (alternatively buying and selling bc we go off limits)
 
 
 import io
@@ -37,6 +40,8 @@ settings_file='settings.json'
 argparser=argparse.ArgumentParser(description="run a trade system")
 argparser.add_argument('--account',type=int,help='the account number to trade')
 argparser.add_argument('--pair',help='the pair to trade (short)')
+argparser.add_argument('--MCP_buytrigger',type=int, default=50, help='MCP below this level triggers buy action up to this level')
+argparser.add_argument('--MCP_selltrigger', type=int, default=90, help='MCP below this level triggers sell action down to this level')
 args=argparser.parse_args()
 if os.path.isfile(settings_file):
     with open('settings.json') as data_file:
@@ -52,89 +57,88 @@ else:
 
 print("%s V0.001 started" %program_name)
 
-oanda3_instrument = args.pair     #"USB10Y_USD"
-oanda3_accountid = args.account   #475120
+robot_instrument = args.pair     #"USB10Y_USD"
+robot_accountid = args.account   #475120
+robot_mcpbuytrigger = args.MCP_buytrigger # 50
+robot_mcpselltrigger  =args.MCP_selltrigger #90
 
 #curl -H "Authorization: Bearer cadccca50a597cc271eba795d89573ee-d1b8c0ba147dffb7b639e7f784d1a1f1" https://api-fxpractice.oanda.com/v1/accounts
 #oanda = oandapy.API(environment="practice",  access_token=None)
 oanda = oandapy.API(environment=settings['environment'], access_token=settings['access_token'])
 
-#tmp=oanda.get_instruments(475120)
+tmp=oanda.get_instruments(475120)
 response = oanda.get_prices(instruments="EUR_USD")
 prices = response.get("prices")
 asking_price = prices[0].get("ask")
 
 print("EUR USD is currently %s", asking_price)
 
-sleep_seconds=5
+sleep_seconds=1
 
 while True:
     #trade oanda3
     sleep(sleep_seconds)
-    response = oanda.get_prices(instruments=oanda3_instrument)
+    response = oanda.get_prices(instruments=robot_instrument)
     instrument_curprice=response['prices'][0]
-    oanda3_curbid=instrument_curprice['bid']
-    oanda3_curask=instrument_curprice['ask']
+    robot_curbid=instrument_curprice['bid']
+    robot_curask=instrument_curprice['ask']
     if 'status' in instrument_curprice:
-        oanda3_curstatus=instrument_curprice['status']
+        robot_curstatus=instrument_curprice['status']
     else:
-        oanda3_curstatus='live'
-    oanda3_curspread=oanda3_curask-oanda3_curbid
-    response = oanda.get_account(oanda3_accountid)
-    oanda3_NAV=response['balance']+response['unrealizedPl']
-    oanda3_margin_used=response['marginUsed']
-    oanda3_margin_rate = response['marginRate']  #typically 0.02
-    oanda3_margin_rate_inv = 1.0/oanda3_margin_rate  #typically 50
-    oanda3_margin_closeout_pct=oanda3_margin_used*oanda3_margin_rate_inv /  oanda3_NAV #need to calculate myself if avail =0
-    oanda3_marginAvail=response['marginAvail']  #more precize than calculating it myself
-    oanda3_position_size=oanda3_margin_used*oanda3_margin_rate_inv
+        robot_curstatus='live'
+    robot_curspread=robot_curask-robot_curbid
+    response = oanda.get_account(robot_accountid)
+    robot_NAV=response['balance']+response['unrealizedPl']
+    robot_margin_used=response['marginUsed']
+    robot_margin_rate = response['marginRate']  #typically 0.02
+    robot_margin_rate_inv = 1.0/robot_margin_rate  #typically 50
+    robot_margin_closeout_pct=robot_margin_used*robot_margin_rate_inv /  robot_NAV #need to calculate myself if avail =0
+    robot_marginAvail=response['marginAvail']  #more precize than calculating it myself
+    robot_position_size=robot_margin_used*robot_margin_rate_inv
     ordercomment=""
 
-    if (oanda3_curstatus != "halted"):
+    if (robot_curstatus != "halted"):
         #calculate price for one position
         #assumes acct is in euros
         #assumes instrument is usd/xxx
         #so wont work in many cases
-        oanda3_onepos=oanda3_curbid / asking_price   # this is instrument price in usd / EUR USD price
-        oanda3_marginneeded_onepos = oanda3_onepos / oanda3_margin_rate_inv
+        robot_onepos=robot_curbid / asking_price   # this is instrument price in usd / EUR USD price
+        robot_marginneeded_onepos = robot_onepos / robot_mcpbuytrigger  #so if we gear 10 times we need 1/10 margin
 
-        if (oanda3_marginAvail>oanda3_marginneeded_onepos):
-            #calculate excess margin
-            #oanda3_excess_margin=(50-oanda3_margin_rate)*50
-            #calculate number i can short
-            number_to_short=math.floor(oanda3_marginAvail / oanda3_marginneeded_onepos)+0.001
-            #short them
-            number_to_short=int(number_to_short)
-            if number_to_short > 0:
-              try:
-                  res=oanda.create_order(oanda3_accountid,instrument=oanda3_instrument,units=number_to_short,side="sell",type="market")
-                  ordercomment="Sold %04d at %.4f" % (res['tradeOpened']['units'],res['price'])
-              except:
-                  ordercomment="exception when trying to create order"
-              sleep_seconds=1# be quick to follow up after order
+        if (robot_margin_closeout_pct<robot_mcpbuytrigger):
+            if (robot_marginAvail>robot_marginneeded_onepos):
+                #calculate excess margin
+                #robot_excess_margin=(50-robot_margin_rate)*50
+                #calculate number i can short
+                number_to_short=math.floor(robot_marginAvail / robot_marginneeded_onepos)+0.001
+                #short them
+                number_to_short=int(number_to_short)
+                if number_to_short > 0:
+                  try:
+                      res=oanda.create_order(robot_accountid,instrument=robot_instrument,units=number_to_short,side="sell",type="market")
+                      ordercomment="Sold %04d at %.4f" % (res['tradeOpened']['units'],res['price'])
+                  except:
+                      ordercomment="exception when trying to create order"
+                  sleep_seconds=1# be quick to follow up after order
 
-        if (oanda3_margin_closeout_pct>90):
-            oanda3_margin_reduce_need = (oanda3_margin_used-90)*oanda3_margin_rate_inv
-            number_to_go_long = math.floor(oanda3_margin_reduce_need /oanda3_onepos)
+        if (robot_margin_closeout_pct>robot_mcpselltrigger):
+            robot_target_margin_used =robot_mcpselltrigger*  robot_NAV  #please test
+            robot_margin_reduce_need = (robot_margin_used-robot_target_margin_used)*robot_margin_rate_inv
+            number_to_go_long = math.floor(robot_margin_reduce_need /robot_onepos)
             number_to_go_long=int(number_to_go_long)
-            res=oanda.create_order(oanda3_accountid,instrument=oanda3_instrument,units=number_to_go_long, side="buy",type="market")
-            ordercomment="Bought %s at %s" % (res['units'],res['price'])
-            sleep_seconds=1# be quick to follow up after order
+            if number_to_go_long>0:
+                try:
+                    res=oanda.create_order(robot_accountid,instrument=robot_instrument,units=number_to_go_long, side="buy",type="market")
+                    ordercomment="Bought %s at %s" % (res['units'],res['price'])
+                except Exception as e:
+                    ordercomment="exception when trying to create sell order(%s)" % str(e)
+                sleep_seconds=1# be quick to follow up after order
 
-        if (oanda3_margin_closeout_pct>65 and oanda3_margin_closeout_pct<75): #be lazy when far from action
-            sleep_seconds=10
-
-        if (oanda3_margin_closeout_pct>55 and oanda3_margin_closeout_pct<85): #more alert when closer to action
-            sleep_seconds=5
-
-        if (oanda3_margin_closeout_pct<55 or oanda3_margin_closeout_pct>85): #more alert when closer to action
-            sleep_seconds=2
-
-        if (oanda3_margin_closeout_pct<51 or oanda3_margin_closeout_pct>89): #more alert when closer to action
-            sleep_seconds=1
+    #be more alert if we are close to a trigger
+    sleep_seconds=max(1,min(robot_margin_closeout_pct-robot_mcpbuytrigger,robot_mcpselltrigger-robot_margin_closeout_pct))
 
 
-    print("%.2f %.2f %.2f %.4f %.2f %.2f %.0f %s" % (oanda3_NAV,oanda3_margin_used, oanda3_margin_closeout_pct,oanda3_curspread, oanda3_curbid, oanda3_curask,oanda3_position_size, ordercomment))
+    print("%.2f %.2f %.2f %.4f %.2f %.2f %.0f %s" % (robot_NAV,robot_margin_used, robot_margin_closeout_pct,robot_curspread, robot_curbid, robot_curask,robot_position_size, ordercomment))
 
 
 
