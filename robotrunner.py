@@ -78,68 +78,69 @@ sleep_seconds=1
 while True:
     #trade oanda3
     sleep(sleep_seconds)
-    response = oanda.get_prices(instruments=robot_instrument)
-    instrument_curprice=response['prices'][0]
-    robot_curbid=instrument_curprice['bid']
-    robot_curask=instrument_curprice['ask']
-    if 'status' in instrument_curprice:
-        robot_curstatus=instrument_curprice['status']
-    else:
-        robot_curstatus='live'
-    robot_curspread=robot_curask-robot_curbid
-    response = oanda.get_account(robot_accountid)
-    robot_NAV=response['balance']+response['unrealizedPl']
-    robot_margin_used=response['marginUsed']
-    robot_margin_rate = response['marginRate']  #typically 0.02
-    robot_margin_rate_inv = 1.0/robot_margin_rate  #typically 50
-    robot_margin_closeout_pct=robot_margin_used*robot_margin_rate_inv /  robot_NAV #need to calculate myself if avail =0
-    robot_marginAvail=response['marginAvail']  #more precize than calculating it myself
-    robot_position_size=robot_margin_used*robot_margin_rate_inv
-    ordercomment=""
+    try:
+        response = oanda.get_prices(instruments=robot_instrument)
+        instrument_curprice=response['prices'][0]
+        robot_curbid=instrument_curprice['bid']
+        robot_curask=instrument_curprice['ask']
+        if 'status' in instrument_curprice:
+            robot_curstatus=instrument_curprice['status']
+        else:
+            robot_curstatus='live'
+        robot_curspread=robot_curask-robot_curbid
+        response = oanda.get_account(robot_accountid)
+        robot_NAV=response['balance']+response['unrealizedPl']
+        robot_margin_used=response['marginUsed']
+        robot_margin_rate = response['marginRate']  #typically 0.02
+        robot_margin_rate_inv = 1.0/robot_margin_rate  #typically 50
+        robot_margin_closeout_pct=robot_margin_used*robot_margin_rate_inv /  robot_NAV #need to calculate myself if avail =0
+        robot_marginAvail=response['marginAvail']  #more precize than calculating it myself
+        robot_position_size=robot_margin_used*robot_margin_rate_inv
+        ordercomment=""
 
-    if (robot_curstatus != "halted"):
-        #calculate price for one position
-        #assumes acct is in euros
-        #assumes instrument is usd/xxx
-        #so wont work in many cases
-        robot_onepos=robot_curbid / asking_price   # this is instrument price in usd / EUR USD price
-        robot_marginneeded_onepos = robot_onepos / robot_mcpbuytrigger  #so if we gear 10 times we need 1/10 margin
+        if (robot_curstatus != "halted"):
+            #calculate price for one position
+            #assumes acct is in euros
+            #assumes instrument is usd/xxx
+            #so wont work in many cases
+            robot_onepos=robot_curbid / asking_price   # this is instrument price in usd / EUR USD price
+            robot_marginneeded_onepos = robot_onepos / robot_mcpbuytrigger  #so if we gear 10 times we need 1/10 margin
 
-        if (robot_margin_closeout_pct<robot_mcpbuytrigger):
-            if (robot_marginAvail>robot_marginneeded_onepos):
-                #calculate excess margin
-                #robot_excess_margin=(50-robot_margin_rate)*50
-                #calculate number i can short
-                number_to_short=math.floor(robot_marginAvail / robot_marginneeded_onepos)+0.001
-                #short them
-                number_to_short=int(number_to_short)
-                if number_to_short > 0:
-                  try:
-                      res=oanda.create_order(robot_accountid,instrument=robot_instrument,units=number_to_short,side="sell",type="market")
-                      ordercomment="Sold %04d at %.4f" % (res['tradeOpened']['units'],res['price'])
-                  except:
-                      ordercomment="exception when trying to create order"
-                  sleep_seconds=1# be quick to follow up after order
+            if (robot_margin_closeout_pct<robot_mcpbuytrigger):
+                if (robot_marginAvail>robot_marginneeded_onepos):
+                    #calculate excess margin
+                    #robot_excess_margin=(50-robot_margin_rate)*50
+                    #calculate number i can short
+                    number_to_short=math.floor(robot_marginAvail / robot_marginneeded_onepos)+0.001
+                    #short them
+                    number_to_short=int(number_to_short)
+                    if number_to_short > 0:
+                      try:
+                          res=oanda.create_order(robot_accountid,instrument=robot_instrument,units=number_to_short,side="sell",type="market")
+                          ordercomment="Sold %04d at %.4f" % (res['tradeOpened']['units'],res['price'])
+                      except:
+                          ordercomment="exception when trying to create order"
+                      sleep_seconds=1# be quick to follow up after order
 
-        if (robot_margin_closeout_pct>robot_mcpselltrigger):
-            robot_target_margin_used =robot_mcpselltrigger*  robot_NAV  #please test
-            robot_margin_reduce_need = (robot_margin_used-robot_target_margin_used)*robot_margin_rate_inv
-            number_to_go_long = math.floor(robot_margin_reduce_need /robot_onepos)
-            number_to_go_long=int(number_to_go_long)
-            if number_to_go_long>0:
-                try:
-                    res=oanda.create_order(robot_accountid,instrument=robot_instrument,units=number_to_go_long, side="buy",type="market")
-                    ordercomment="Bought %s at %s" % (res['units'],res['price'])
-                except Exception as e:
-                    ordercomment="exception when trying to create sell order(%s)" % str(e)
-                sleep_seconds=1# be quick to follow up after order
+            if (robot_margin_closeout_pct>robot_mcpselltrigger):
+                robot_target_margin_used =robot_mcpselltrigger*  robot_NAV  #please test
+                robot_margin_reduce_need = (robot_margin_used-robot_target_margin_used)*robot_margin_rate_inv
+                number_to_go_long = math.floor(robot_margin_reduce_need /robot_onepos)
+                number_to_go_long=int(number_to_go_long)
+                if number_to_go_long>0:
+                    try:
+                        res=oanda.create_order(robot_accountid,instrument=robot_instrument,units=number_to_go_long, side="buy",type="market")
+                        ordercomment="Bought %s at %s" % (res['units'],res['price'])
+                    except Exception as e:
+                        ordercomment="exception when trying to create sell order(%s)" % str(e)
+                    sleep_seconds=1# be quick to follow up after order
 
-    #be more alert if we are close to a trigger
-    sleep_seconds=max(1,min(robot_margin_closeout_pct-robot_mcpbuytrigger,robot_mcpselltrigger-robot_margin_closeout_pct))
-
+        #be more alert if we are close to a trigger
+        sleep_seconds=max(1,min(robot_margin_closeout_pct-robot_mcpbuytrigger,robot_mcpselltrigger-robot_margin_closeout_pct))
+    except Exception as e:
+        ordercomment= "%s - exception occoured (%s)" % (ordercomment,str(e))
 
     print("%.2f %.2f %.2f %.4f %.2f %.2f %.0f %s" % (robot_NAV,robot_margin_used, robot_margin_closeout_pct,robot_curspread, robot_curbid, robot_curask,robot_position_size, ordercomment))
-
 
 
 
