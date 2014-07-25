@@ -196,20 +196,34 @@ while True:
 
     ts = datetime.datetime.now().strftime('%H:%M:%S')
     if abs(last_robot_NAV - robot_NAV) > 1 or ordercomment <> "":
-        position_size_usd=0
+        account_size_usd=0
         positions = oanda.get_positions(robot_accountid)['positions'] #in usd
+        largest_instrument=""
+        largest_position_usd=0
         for position in positions:
             instrument=position['instrument']
             units=position['units']
+            position_size_usd=0
             if instrument[:3]=="USD":
-                position_size_usd+=units
+                account_size_usd+=units
+                position_size_usd=units
             else:
-                price = oanda.get_prices(instruments=instrument)['prices'][0]['bid']
-                position_size_usd +=price*units
-        position_size_eur=position_size_usd/eur_usd_bid
-        print("%.2f %.2f %.2f %.4f %.2f %.2f %.0f %5f %s %s %s" % (
-            robot_NAV, robot_margin_closeout_pct, robot_margin_used, robot_curspread, robot_curbid, robot_curask,
-            position_size_eur,last_checked_position_units, last_checked_position,ordercomment,ts))
+                bid = oanda.get_prices(instruments=instrument)['prices'][0]['bid']
+                position_size_usd=bid*units
+                account_size_usd +=position_size_usd
+            if position_size_usd>largest_position_usd:
+                largest_position_usd=account_size_usd
+                largest_instrument=instrument
+        if largest_instrument=="":
+            largest_instrument="EUR_USD"#avoid crash if no positions
+        position_size_eur=account_size_usd/eur_usd_bid
+        largest_position_eur=largest_position_usd / eur_usd_bid
+        largest_postion_bid = oanda.get_prices(instruments=largest_instrument)['prices'][0]['bid']
+        largest_postion_ask = oanda.get_prices(instruments=largest_instrument)['prices'][0]['ask']
+        largest_position_spread = largest_postion_ask-largest_postion_bid
+        print("%.2f %7.0f %.2f %.2f %.4f %.2f %.2f %.0f %s %s %s" % (
+            robot_NAV,position_size_eur, robot_margin_closeout_pct, robot_margin_used, largest_position_spread, largest_postion_bid, largest_postion_ask,
+            largest_position_eur, largest_instrument,ordercomment,ts))
         last_robot_NAV = robot_NAV
 
 print("%s V0.001 ended" % program_name)
