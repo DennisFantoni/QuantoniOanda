@@ -1,0 +1,24 @@
+{    "environment": "live",
+    "crosses": [
+        {
+            "direction": 1,
+            "instrument": "USB02Y_USD",
+            "weight": 0.25
+        },
+        {
+            "direction": 1,
+            "instrument": "USB05Y_USD",
+            "weight": 0.25
+        },
+        {
+            "direction": 1,
+            "instrument": "USB10Y_USD",
+            "weight": 0.25
+        },
+        {
+            "direction": 1,
+            "instrument": "USB30Y_USD",
+            "weight": 0.25
+        }
+
+    ]}
