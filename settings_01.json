@@ -1,0 +1,13 @@
+{    "environment": "live",
+    "crosses": [
+        {
+            "direction": 1,
+            "instrument": "XAG_USD",
+            "weight": 0.25
+        },
+        {
+            "direction": 1,
+            "instrument": "XAU_USD",
+            "weight": 0.25
+        }
+    ]}

@@ -26,6 +26,7 @@ import math
 import argparse
 import os
 import datetime
+import robot_api
 
 program_name = "Robot Runner"
 
@@ -77,9 +78,9 @@ robot_mcpbuytrigger = args.MCP_buytrigger  # 50
 robot_mcpselltrigger = args.MCP_selltrigger  #90
 robot_maxpos = args.maxpos
 
-#curl -H "Authorization: Bearer cadccca50a597cc271eba795d89573ee-d1b8c0ba147dffb7b639e7f784d1a1f1" https://api-fxpractice.oanda.com/v1/accounts
-#oanda = oandapy.API(environment="practice",  access_token=None)
-oanda = oandapy.API(environment=settings['environment'], access_token=settings['access_token'])
+account_token = robot_api.read_account_token()
+
+oanda = oandapy.API(environment=settings['environment'], access_token=account_token['access_token'])
 
 tmp = oanda.get_instruments(robot_accountid)
 
@@ -95,9 +96,11 @@ instrumentscsv=instrumentscsv[:-1]
 sleep_seconds = 1
 last_robot_NAV = 0
 
+
 while True:
     #trade oanda3
     sleep(sleep_seconds)
+    spreads = robot_api.read_spreads()
     try:
         eur_usd_response = oanda.get_prices(instruments="EUR_USD")
         eur_usd_prices = eur_usd_response.get("prices")
@@ -105,7 +108,8 @@ while True:
 
         #gather account information
         account_info = oanda.get_account(robot_accountid)
-        robot_NAV = account_info['balance'] + account_info['unrealizedPl']
+        unrealized_profit_loss=account_info['unrealizedPl']
+        robot_NAV = account_info['balance'] +unrealized_profit_loss
         robot_margin_used = account_info['marginUsed']
         robot_margin_rate = account_info['marginRate']  #typically 0.02
         robot_margin_rate_inv = 1.0 / robot_margin_rate  #typically 50
@@ -139,7 +143,9 @@ while True:
                 last_checked_position_units =0  # unknown. just for display
 
                 if robot_curstatus == 'live':
-                    robot_maxspread=instrument_totrade['max_spread']
+                    spread_info = spreads[instrumentname1]
+                    robot_maxspread=spread_info[u'min_spread']*1.5
+
                     if args.debug == 1:
                         if robot_curspread > robot_maxspread:
                             print("%s curspread(%.7f) maxspread(%7f)"  % (instrumentname1, robot_curspread, robot_maxspread))
@@ -174,7 +180,13 @@ while True:
 
                         if  (position_size < positionsize_min) :
                             units_to_open = int(math.floor(positionsize_min - position_size))
-                            if units_to_open>0 and robot_marginAvail * unit_size_in_euros * robot_margin_rate_inv >units_to_open:
+                            can_afford_units = robot_marginAvail  *robot_margin_rate_inv / unit_size_in_euros
+                            if (units_to_open > can_afford_units):
+                                units_to_open = int(math.floor(can_afford_units))    # if weights are very skewed we might not be able to afford
+                            if ((units_to_open < positionsize_min / 100) and (positionsize_min>100)):
+                                units_to_open = 0   # oanda only allows 1K open trades. to reduce number of trades, lump them together
+
+                            if units_to_open>0 and can_afford_units >units_to_open:
                                 try:
                                     res = oanda.create_order(robot_accountid, instrument=instrumentname1,
                                                              units=units_to_open, side=openside, type="market")
@@ -228,11 +240,11 @@ while True:
             largest_instrument="EUR_USD"#avoid crash if no positions
         position_size_eur=account_size_usd/eur_usd_bid
         largest_position_eur=largest_position_usd / eur_usd_bid
-        largest_postion_bid = oanda.get_prices(instruments=largest_instrument)['prices'][0]['bid']
-        largest_postion_ask = oanda.get_prices(instruments=largest_instrument)['prices'][0]['ask']
-        largest_position_spread = largest_postion_ask-largest_postion_bid
-        print("%.2f %7.0f %.2f %.2f %.4f %.2f %.2f %.0f %s %s %s" % (
-            robot_NAV,position_size_eur, robot_margin_closeout_pct, robot_margin_used, largest_position_spread, largest_postion_bid, largest_postion_ask,
+        #largest_postion_bid = oanda.get_prices(instruments=largest_instrument)['prices'][0]['bid']
+        #largest_postion_ask = oanda.get_prices(instruments=largest_instrument)['prices'][0]['ask']
+        #largest_position_spread = largest_postion_ask-largest_postion_bid
+        print("%.2f %.2f %7.0f %.2f %.2f  %.0f %s %s %s" % (
+            robot_NAV,unrealized_profit_loss, position_size_eur, robot_margin_closeout_pct, robot_margin_used,
             largest_position_eur, largest_instrument,ordercomment,ts))
         last_robot_NAV = robot_NAV
 
