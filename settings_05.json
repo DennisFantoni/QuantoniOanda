@@ -1,0 +1,5 @@
+{    "environment": "live",
+  "crosses": [
+    {"direction": 0, "instrument": "WTICO_USD",  "weight": 0.5},
+    {"direction": 0, "instrument": "BCO_USD",  "weight": 0.5}
+  ]}
