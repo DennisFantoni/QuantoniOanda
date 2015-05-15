@@ -3,11 +3,6 @@
         {
             "direction": 0,
             "instrument": "XAG_USD",
-            "weight": 0.5
-        },
-        {
-            "direction": 0,
-            "instrument": "XAU_USD",
-            "weight": 0.5
+            "weight": 1
         }
     ]}

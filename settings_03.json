@@ -1,0 +1,9 @@
+{    "environment": "live",
+  "crosses": [
+    {
+      "direction": 1,
+      "instrument": "USB30Y_USD",
+      "weight": 1
+    }
+
+  ]}

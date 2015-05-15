@@ -1,2 +1,2 @@
 #!/bin/bash
-./run_a_robot.sh 177484 02 50 90 --debug 1
+./run_a_robot.sh 177484 02 40 80 --debug 1

@@ -1,29 +1,14 @@
-{    "environment": "live",
+{"comment":"removed XAU_USD direction 0 weight 0.25 in ",
+    "environment": "live",
     "crosses": [
         {
             "direction": 1,
-            "instrument": "NAS100_USD",
-            "weight": 0.01
-        },
-        {
-            "direction": 1,
             "instrument": "SPX500_USD",
-            "weight": 0.01
-        },
-        {
-            "direction": 1,
-            "instrument": "US2000_USD",
             "weight": 0.5
         },
         {
             "direction": 0,
             "instrument": "XAG_USD",
-            "weight": 0.25
-        },
-        {
-            "direction": 0,
-            "instrument": "XAU_USD",
-            "weight": 0.25
+            "weight": 0.5
         }
-
     ]}
