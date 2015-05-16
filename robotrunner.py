@@ -100,6 +100,7 @@ while True:
     sleep(sleep_seconds)
     spreads = robot_api.read_spreads()
     try:
+        ordercomment = ""
         eur_usd_response = oanda.get_prices(instruments="EUR_USD")
         eur_usd_prices = eur_usd_response.get("prices")
         eur_usd_bid = eur_usd_prices[0].get("bid")
