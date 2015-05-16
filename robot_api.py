@@ -6,7 +6,7 @@ import json
 import datetime
 
 def get_spreads_filename():
-    return 'spreads2.json'
+    return 'spreads_nogit.json'
 
 
 def get_account_token_filename():
