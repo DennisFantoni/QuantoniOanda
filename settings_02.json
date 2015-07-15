@@ -7,7 +7,7 @@
         {"direction": 0, "instrument": "BCO_USD",  "weight": 0.05},
         {"direction": 0, "instrument": "NZD_USD", "weight": 0.01442},
         {"direction": 0, "instrument": "AUD_USD", "weight": 0.01442},
-        {"direction": 1, "instrument": "USD_CHF",  "weight": 0.01442},
+        {"direction": 1, "instrument": "USD_CHF",  "weight": 0.02884},
         {"direction": 1, "instrument": "USD_CNH",  "weight": 0.01442},
         {"direction": 1, "instrument": "USD_HKD",  "weight": 0.01442},
         {"direction": 1, "instrument": "USD_NOK",  "weight": 0.01442},
@@ -15,7 +15,7 @@
         {"direction": 1, "instrument": "USD_SEK",  "weight": 0.01442},
         {"direction": 1, "instrument": "USD_SGD",  "weight": 0.01442},
         {"direction": 1, "instrument": "USD_TRY",  "weight": 0.01442},
-        {"direction": 1, "instrument": "USD_TWD", "weight": 0.01442},
+
         {"direction": 0, "instrument": "EUR_USD", "weight": 0.005681},
         {"direction": 1, "instrument": "USD_CAD",  "weight": 0.005681},
         {"direction": 0, "instrument": "GBP_USD",  "weight": 0.005681},
