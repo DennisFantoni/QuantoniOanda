@@ -37,7 +37,7 @@ import oandapy
 
 settings = {}
 
-settings_file = 'settings.json'
+#settings_file = 'settings.json'
 
 argparser = argparse.ArgumentParser(description="run a trade system")
 argparser.add_argument('--debug', type=int, default=0,
